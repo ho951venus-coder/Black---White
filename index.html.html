@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>婚宴座位安排系統 | Wedding Seating Planner</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans TC"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            rosewood: {
+              50: '#fff5f6',
+              100: '#ffe6e8',
+              500: '#e63946',
+              600: '#d62828',
+              800: '#9e1b20',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #f1f5f9;
+      user-select: none;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    /* Grid Canvas Pattern */
+    .bg-grid-pattern {
+      background-size: 32px 32px;
+      background-image: 
+        radial-gradient(circle, #cbd5e1 1.2px, transparent 1.2px);
+    }
+    .dragging-guest {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    .seat-drag-over {
+      border-color: #e63946 !important;
+      background-color: #ffe6e8 !important;
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(230, 57, 70, 0.3);
+    }
+    .table-node {
+      touch-action: none;
+    }
+    /* Custom High-Contrast Dark Cursors */
+    .canvas-cursor-grab {
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="%231e293b" stroke="%23ffffff" stroke-width="1.5"><path d="M9 11.24V7.5a1.5 1.5 0 0 1 3 0v3.74c0 .41.34.75.75.75s.75-.34.75-.75V6.5a1.5 1.5 0 0 1 3 0v4.74c0 .41.34.75.75.75s.75-.34.75-.75V8.5a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-2a6 6 0 0 1-6-6v-5a1.5 1.5 0 0 1 3 0v.74c0 .41.34.75.75.75s.75-.34.75-.75z"/></svg>') 12 12, grab !important;
+    }
+    .canvas-cursor-grabbing {
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="%230f172a" stroke="%23ffffff" stroke-width="1.5"><path d="M18 11.5a1.5 1.5 0 0 0-3 0v-1a1.5 1.5 0 0 0-3 0v-1a1.5 1.5 0 0 0-3 0v-2.5a1.5 1.5 0 0 0-3 0v9.5a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-5a1.5 1.5 0 0 0-3 0z"/></svg>') 12 12, grabbing !important;
+    }
+    .guest-card-cursor, button, select, input[type="checkbox"] {
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="%230f172a" stroke="%23ffffff" stroke-width="1.5"><path d="M5.5 3.5l14 8-6 2.5-3 6.5-2-1 3-6.5-6-3.5z"/></svg>') 4 4, pointer !important;
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col font-sans text-slate-800 overflow-hidden">
+
+  <!-- Header Navbar -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shrink-0 z-20 shadow-sm">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-full bg-rosewood-50 flex items-center justify-center text-rosewood-500 font-bold text-xl border border-rosewood-100">
+        <i class="fa-solid fa-ring"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-slate-800 leading-tight">婚宴座位安排系統</h1>
+        <p class="text-xs text-slate-500">Interactive Wedding Floor Plan & Seating Planner</p>
+      </div>
+    </div>
+
+    <!-- Quick Stats Header Bar -->
+    <div class="hidden lg:flex items-center space-x-6 text-sm bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
+      <div class="flex items-center space-x-1.5">
+        <span class="text-slate-500">總賓客:</span>
+        <span id="stat-total" class="font-bold text-slate-800">0</span> 人
+      </div>
+      <div class="h-4 w-px bg-slate-300"></div>
+      <div class="flex items-center space-x-1.5">
+        <span class="text-slate-500">已入座:</span>
+        <span id="stat-seated" class="font-bold text-emerald-600">0</span> 人
+      </div>
+      <div class="h-4 w-px bg-slate-300"></div>
+      <div class="flex items-center space-x-1.5">
+        <span class="text-slate-500">未入座:</span>
+        <span id="stat-unseated" class="font-bold text-rosewood-500">0</span> 人
+      </div>
+      <div class="h-4 w-px bg-slate-300"></div>
+      <div class="flex items-center space-x-1.5">
+        <span class="text-slate-500">桌數:</span>
+        <span id="stat-tables" class="font-bold text-slate-800">0</span> 桌
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center space-x-2">
+      <button id="btn-top-sync" onclick="openSyncModal()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-users-line"></i>
+        <span>雲端共同編輯</span>
+      </button>
+      <button id="btn-top-import" onclick="openImportModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-file-import"></i>
+        <span>匯入Excel名單</span>
+      </button>
+      <button id="btn-top-groups" onclick="openManageGroupsModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-tags"></i>
+        <span>管理族群</span>
+      </button>
+      <button id="btn-top-add-guest" onclick="openAddGuestModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-user-plus"></i>
+        <span>新增賓客</span>
+      </button>
+      <button id="btn-top-add-table" onclick="openAddTableModal()" class="bg-rosewood-500 hover:bg-rosewood-600 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-plus"></i>
+        <span>新增桌次</span>
+      </button>
+      <button id="btn-top-backup" onclick="exportJSONBackup()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm" title="匯出JSON檔備份">
+        <i class="fa-solid fa-download"></i>
+        <span>備份</span>
+      </button>
+      <button id="btn-top-restore" onclick="triggerRestoreJSON()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm" title="匯入JSON備份檔案">
+        <i class="fa-solid fa-upload"></i>
+        <span>還原</span>
+      </button>
+      <input type="file" id="restore-json-input" accept=".json" class="hidden" onchange="importJSONBackup(event)">
+      <button id="btn-top-export" onclick="openExportModal()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs md:text-sm font-medium px-3.5 py-2 rounded-lg transition-all flex items-center space-x-1.5 shadow-sm">
+        <i class="fa-solid fa-file-invoice"></i>
+        <span>統計與列印</span>
+      </button>
+      <button id="btn-top-reset" onclick="resetDataConfirm()" class="text-slate-400 hover:text-rosewood-500 p-2 rounded-lg transition-colors" title="重設範例資料">
+        <i class="fa-solid fa-rotate-right text-base"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Left Sidebar: Unassigned Guests -->
+    <aside class="w-80 md:w-88 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-lg">
+      
+      <!-- Panel Header & Filter -->
+      <div class="p-4 border-b border-slate-100 space-y-3 bg-slate-50/50">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-slate-700 flex items-center space-x-2 text-sm">
+            <i class="fa-solid fa-users text-slate-400"></i>
+            <span>未安排賓客</span>
+            <span id="unseated-badge" class="bg-rosewood-100 text-rosewood-600 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          </h2>
+          <button onclick="toggleBatchDeleteMode()" id="btn-batch-toggle" class="text-[11px] text-slate-500 hover:text-rosewood-600 font-medium px-2 py-0.5 rounded border border-slate-200 bg-white transition-colors flex items-center space-x-1">
+            <i class="fa-solid fa-list-check"></i>
+            <span id="batch-toggle-text">多選刪除</span>
+          </button>
+        </div>
+
+        <!-- Batch Action Bar -->
+        <div id="batch-action-bar" class="hidden bg-rosewood-50 border border-rosewood-200 p-2 rounded-lg flex items-center justify-between text-xs">
+          <label class="flex items-center space-x-1.5 cursor-pointer text-slate-700 font-medium">
+            <input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAllUnseated(this.checked)" class="rounded text-rosewood-500 focus:ring-rosewood-500">
+            <span>全選</span>
+          </label>
+          <button onclick="deleteSelectedGuests()" class="bg-rosewood-600 hover:bg-rosewood-700 text-white font-medium px-2.5 py-1 rounded shadow-sm transition-colors flex items-center space-x-1">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>刪除選取 (<span id="selected-count">0</span>)</span>
+          </button>
+        </div>
+
+        <!-- Search Input -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+          <input type="text" id="search-guest" oninput="renderUnseatedList()" placeholder="搜尋賓客姓名..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-rosewood-500 transition-colors">
+        </div>
+
+        <!-- Filter Select -->
+        <div class="flex space-x-2">
+          <select id="filter-group" onchange="renderUnseatedList()" class="w-full text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:border-rosewood-500">
+            <option value="ALL">所有族群</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Drag Back Area & Unassigned List -->
+      <div id="unseated-container" 
+           ondragover="handleGuestDragOver(event)" 
+           ondragleave="handleGuestDragLeave(event)" 
+           ondrop="handleDropToUnseated(event)" 
+           class="flex-1 overflow-y-auto p-3.5 space-y-2 transition-all">
+      </div>
+
+      <!-- Quick Add Form -->
+      <div class="p-3 border-t border-slate-200 bg-slate-50">
+        <form onsubmit="handleQuickAddGuest(event)" class="space-y-2">
+          <div class="flex space-x-2">
+            <input type="text" id="quick-guest-name" placeholder="姓名 (如: 小白)" required class="flex-1 text-xs px-2.5 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:border-rosewood-500">
+            <div class="w-20 flex items-center bg-white border border-slate-200 rounded-md px-1.5">
+              <span class="text-[10px] text-slate-400 mr-1">人數</span>
+              <input type="number" id="quick-guest-count" min="1" max="20" value="1" required class="w-full text-xs font-bold text-slate-700 border-none p-0 focus:ring-0 focus:outline-none">
+            </div>
+          </div>
+          <div class="flex space-x-2">
+            <select id="quick-guest-group" class="flex-1 text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white">
+            </select>
+            <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-3 py-1.5 rounded-md transition-colors shrink-0">批次新增</button>
+          </div>
+        </form>
+      </div>
+    </aside>
+
+    <!-- Canvas Container (Large Interactive Workspace) -->
+    <main id="viewport" class="flex-1 relative overflow-hidden bg-slate-200/70 canvas-cursor-grab">
+      
+      <!-- Canvas Zoom Controls Overlay -->
+      <div class="absolute bottom-6 right-6 bg-white border border-slate-200 shadow-md rounded-xl p-1.5 flex items-center space-x-1 z-30">
+        <button onclick="zoomCanvas(-0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-slate-600 transition-colors" title="縮小">
+          <i class="fa-solid fa-minus text-xs"></i>
+        </button>
+        <span id="zoom-level-text" class="text-xs font-semibold text-slate-600 px-2 min-w-[45px] text-center">100%</span>
+        <button onclick="zoomCanvas(0.1)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-slate-600 transition-colors" title="放大">
+          <i class="fa-solid fa-plus text-xs"></i>
+        </button>
+        <div class="h-4 w-px bg-slate-200 my-auto mx-1"></div>
+        <button onclick="resetZoomAndPan()" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded-lg text-slate-600 transition-colors" title="重設視角">
+          <i class="fa-solid fa-expand text-xs"></i>
+        </button>
+      </div>
+
+      <!-- Interactive Canvas Layer -->
+      <div id="canvas" class="absolute w-[3200px] h-[2400px] bg-slate-100 bg-grid-pattern transform-gpu origin-top-left transition-transform duration-75">
+        
+        <!-- Stage Landmark -->
+        <div class="absolute top-10 left-[1100px] w-[1000px] h-20 bg-gradient-to-r from-rosewood-500 via-rose-400 to-rosewood-500 rounded-2xl shadow-md flex items-center justify-center text-white font-bold tracking-widest text-lg border-2 border-white/40 pointer-events-none">
+          <i class="fa-solid fa-champagne-glasses mr-3"></i> 婚宴主舞台 (MAIN STAGE)
+        </div>
+
+        <!-- Entrance Landmark -->
+        <div class="absolute bottom-10 left-[1250px] w-[700px] h-14 bg-slate-700 rounded-xl shadow-md flex items-center justify-center text-slate-200 font-bold tracking-widest text-sm border-2 border-slate-500 pointer-events-none">
+          <i class="fa-solid fa-door-open mr-2"></i> 會場入口 (ENTRANCE)
+        </div>
+
+        <!-- Dynamic Tables Layer -->
+        <div id="tables-container">
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Modal: Add / Edit Guest -->
+  <div id="guest-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 id="modal-title" class="font-bold text-lg text-slate-800">新增賓客資料</h3>
+        <button onclick="closeGuestModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="guest-form" onsubmit="saveGuest(event)" class="space-y-3">
+        <input type="hidden" id="form-guest-id">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">賓客姓名</label>
+          <input type="text" id="form-guest-name" required placeholder="例如：王小明" class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-rosewood-500">
+        </div>
+
+        <div id="form-count-container">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">報名人數 (自動拆解分組)</label>
+          <input type="number" id="form-guest-count" min="1" max="20" value="1" required class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-rosewood-500 font-bold">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">所屬族群</label>
+          <select id="form-guest-group" class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-rosewood-500">
+          </select>
+        </div>
+
+        <div class="flex space-x-6 pt-1">
+          <label class="flex items-center space-x-2 text-xs font-medium text-slate-700 cursor-pointer">
+            <input type="checkbox" id="form-guest-veg" class="rounded text-emerald-600 focus:ring-emerald-500">
+            <span>🥬 吃素</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs font-medium text-slate-700 cursor-pointer">
+            <input type="checkbox" id="form-guest-child" class="rounded text-blue-600 focus:ring-blue-500">
+            <span>👦 小孩</span>
+          </label>
+          <label class="flex items-center space-x-2 text-xs font-medium text-slate-700 cursor-pointer">
+            <input type="checkbox" id="form-guest-chair" class="rounded text-amber-600 focus:ring-amber-500">
+            <span>👶 需要兒童座椅</span>
+          </label>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-3 border-t">
+          <button type="button" onclick="closeGuestModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+          <button type="submit" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-900 text-white rounded-lg shadow-sm font-bold">儲存賓客</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Table -->
+  <div id="add-table-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <h3 class="font-bold text-lg text-slate-800">新增桌次擺設</h3>
+        <button onclick="closeAddTableModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form onsubmit="handleSaveNewTable(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">桌次名稱 / 描述</label>
+          <input type="text" id="new-table-name" placeholder="例如：桌次 (06) 或 男方大學同學桌" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rosewood-500/20 focus:border-rosewood-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">座位容納人數 (容量)</label>
+          <input type="number" id="new-table-capacity" min="1" max="30" value="10" required class="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-rosewood-500/20 focus:border-rosewood-500 font-bold text-rosewood-600">
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t">
+          <button type="button" onclick="closeAddTableModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+          <button type="submit" class="px-4 py-2 text-xs font-medium bg-rosewood-500 hover:bg-rosewood-600 text-white rounded-lg shadow-sm font-bold">建立桌次</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Manage Custom Groups -->
+  <div id="groups-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 class="font-bold text-lg text-slate-800">自訂賓客族群管理</h3>
+          <p class="text-xs text-slate-500">提供 11 種主題配色，支援新增、修改與刪除族群</p>
+        </div>
+        <button onclick="closeManageGroupsModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form onsubmit="handleAddGroup(event)" class="flex items-center space-x-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <input type="text" id="new-group-name" placeholder="新族群名稱 (如: 男方桌球社)" required class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 bg-white">
+        <select id="new-group-theme" class="text-xs border border-slate-300 rounded-lg px-2 py-2 bg-white">
+          <option value="rose">粉紅系</option>
+          <option value="blue">天空藍</option>
+          <option value="navy">經典藍</option>
+          <option value="emerald">翡翠綠</option>
+          <option value="amber">琥珀橘</option>
+          <option value="purple">典雅紫</option>
+          <option value="cyan">青藍系</option>
+          <option value="teal">松石綠</option>
+          <option value="coral">珊瑚紅</option>
+          <option value="obsidian">曜石黑</option>
+          <option value="slate">灰褐色</option>
+        </select>
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition-colors shrink-0">
+          <i class="fa-solid fa-plus mr-1"></i>新增
+        </button>
+      </form>
+
+      <div id="groups-list-container" class="max-h-60 overflow-y-auto space-y-2 pr-1">
+      </div>
+
+      <div class="flex justify-end pt-2 border-t">
+        <button type="button" onclick="closeManageGroupsModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Batch Import Guests -->
+  <div id="import-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 class="font-bold text-lg text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-file-excel text-emerald-600"></i>
+            <span>批次匯入賓客名單 (Excel / 複製貼上)</span>
+          </h3>
+          <p class="text-xs text-slate-500">直接複製 Excel 中的表格並貼在下方文字框即可自動解析匯入</p>
+        </div>
+        <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">預設指定族群</label>
+          <select id="import-default-group" class="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-emerald-500">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">
+            貼上 Excel / CSV 文字內容 
+            <span class="text-[11px] font-normal text-slate-400">(格式支援：姓名, 人數, 素食人數, 小孩人數, 兒童椅人數)</span>
+          </label>
+          <textarea id="import-text" rows="8" placeholder="例如貼上：&#10;王小明	2	0	0	1&#10;李小美	3	1	1	0&#10;張大同	1	0	0	0" class="w-full font-mono text-xs border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-slate-50/50"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-3 border-t">
+        <button type="button" onclick="closeImportModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+        <button type="button" onclick="processBatchImport()" class="px-5 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm font-bold flex items-center space-x-1">
+          <i class="fa-solid fa-check"></i>
+          <span>開始解析並匯入</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Export Summary -->
+  <div id="export-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col p-6 shadow-2xl">
+      <div class="flex items-center justify-between border-b pb-3 mb-4">
+        <div>
+          <h3 class="font-bold text-lg text-slate-800">婚宴桌次與餐點需求摘要</h3>
+          <p class="text-xs text-slate-500">供飯店備餐、佈置與現場工作人員核對</p>
+        </div>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div id="export-content" class="flex-1 overflow-y-auto space-y-3 pr-2">
+      </div>
+      <div class="flex justify-end space-x-2 pt-4 border-t mt-4">
+        <button type="button" onclick="closeExportModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">關閉</button>
+        <button type="button" onclick="window.print()" class="px-5 py-2 text-xs font-medium bg-rosewood-500 hover:bg-rosewood-600 text-white rounded-lg shadow-sm font-bold flex items-center space-x-1">
+          <i class="fa-solid fa-print"></i>
+          <span>列印 / 儲存 PDF</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Custom Confirm Action -->
+  <div id="confirm-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
+      <div class="flex items-center space-x-3 text-rosewood-500">
+        <div class="w-10 h-10 rounded-full bg-rosewood-50 flex items-center justify-center shrink-0 border border-rosewood-100">
+          <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+        </div>
+        <div>
+          <h3 id="confirm-modal-title" class="font-bold text-base text-slate-800">確認操作</h3>
+          <p id="confirm-modal-msg" class="text-xs text-slate-500 mt-0.5">確定要執行此操作嗎？</p>
+        </div>
+      </div>
+      <div class="flex justify-end space-x-2 pt-3 border-t">
+        <button type="button" onclick="closeCustomConfirm(false)" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">取消</button>
+        <button type="button" id="confirm-modal-btn" onclick="closeCustomConfirm(true)" class="px-4 py-2 text-xs font-medium bg-rosewood-600 hover:bg-rosewood-700 text-white rounded-lg shadow-sm font-bold">確定刪除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Live Collaborative Room Sync -->
+  <div id="sync-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 class="font-bold text-lg text-slate-800 flex items-center space-x-2">
+            <i class="fa-solid fa-cloud-arrow-up text-violet-600"></i>
+            <span>線上多人即時共同編輯</span>
+          </h3>
+          <p class="text-xs text-slate-500">輸入協作者的 Email 信箱或代碼，邀請對方一起加入婚宴排座</p>
+        </div>
+        <button onclick="closeSyncModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-4">
+        <div class="bg-violet-50 border border-violet-100 p-3.5 rounded-xl space-y-2">
+          <div class="text-xs font-bold text-violet-800">當前協作空間：</div>
+          <div class="flex items-center justify-between text-xs text-slate-600 bg-white p-2.5 rounded-lg border border-violet-200">
+            <span>房間代碼：<strong id="current-room-id" class="text-slate-800 font-mono">wedding_room_default</strong></span>
+            <button onclick="copyRoomCode()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded">📋 複製代碼</button>
+          </div>
+          <div id="sync-status-badge" class="px-2 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 text-center">
+            🟢 預設雲端連線中 (所有開啟者雙向同步)
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">分享與邀請方式</label>
+          <div class="flex space-x-2">
+            <input type="text" id="share-link-input" readonly class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-mono text-slate-600">
+            <button onclick="copyShareLink()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition-colors shrink-0 flex items-center space-x-1 guest-card-cursor">
+              <i class="fa-solid fa-copy"></i>
+              <span>複製連結</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="border-t pt-3">
+          <label class="block text-xs font-semibold text-slate-600 mb-1">切換專屬房間 / 輸入 Email 信箱</label>
+          <div class="flex space-x-2">
+            <input type="email" id="collaborator-email-input" placeholder="例如: partner@wedding.com" class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-violet-500 guest-card-cursor">
+            <button onclick="inviteByEmail()" class="bg-violet-600 hover:bg-violet-700 text-white text-xs px-3.5 py-2 rounded-lg font-bold transition-colors shrink-0 guest-card-cursor flex items-center space-x-1">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>切換房間連線</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-3 border-t">
+        <button type="button" onclick="closeSyncModal()" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg guest-card-cursor">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white text-xs px-4 py-2.5 rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 z-50"></div>
+
+  <!-- Firebase Integration Script for Live Sync -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'wedding-planner-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+    let db = null;
+    let auth = null;
+    let roomId = null;
+    let isRemoteUpdating = false;
+
+    // Use default global room so offline and Netlify instances share same dataset automatically
+    const urlParams = new URLSearchParams(window.location.search);
+    roomId = urlParams.get('room') || localStorage.getItem('wedding_planner_room_id') || 'wedding_room_default';
+    localStorage.setItem('wedding_planner_room_id', roomId);
+
+    if (firebaseConfig) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        signInAnonymously(auth).then(() => {
+          onAuthStateChanged(auth, (user) => {
+            if (user) {
+              initCloudSync();
+            }
+          });
+        }).catch(err => {
+          updateSyncUI(false);
+        });
+      } catch(e) {
+        updateSyncUI(false);
+      }
+    } else {
+      updateSyncUI(false);
+    }
+
+    function initCloudSync() {
+      if (!db || !roomId) return;
+
+      try {
+        const docRef = doc(db, 'public', roomId);
+        onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data && !isRemoteUpdating) {
+              isRemoteUpdating = true;
+              if (data.groups) window.customGroups = data.groups;
+              if (data.guests) window.guests = data.guests;
+              if (data.tables) window.tables = data.tables;
+
+              localStorage.setItem('wedding_planner_groups', JSON.stringify(window.customGroups));
+              localStorage.setItem('wedding_planner_guests', JSON.stringify(window.guests));
+              localStorage.setItem('wedding_planner_tables', JSON.stringify(window.tables));
+
+              if (typeof window.renderGroupDropdowns === 'function') window.renderGroupDropdowns();
+              if (typeof window.renderAll === 'function') window.renderAll();
+              
+              updateSyncUI(true);
+              setTimeout(() => { isRemoteUpdating = false; }, 300);
+            }
+          } else {
+            pushCloudState();
+          }
+        }, (err) => {
+          updateSyncUI(false);
+        });
+      } catch (err) {
+        updateSyncUI(false);
+      }
+    }
+
+    window.pushCloudState = function() {
+      if (!db || !roomId || isRemoteUpdating) return;
+      try {
+        const docRef = doc(db, 'public', roomId);
+        setDoc(docRef, {
+          groups: window.customGroups,
+          guests: window.guests,
+          tables: window.tables,
+          updatedAt: Date.now()
+        }, { merge: true }).then(() => {
+          updateSyncUI(true);
+        }).catch(err => {
+          updateSyncUI(false);
+        });
+      } catch(e) {
+        updateSyncUI(false);
+      }
+    }
+
+    function updateSyncUI(isOnline) {
+      const badge = document.getElementById('sync-status-badge');
+      const roomIdEl = document.getElementById('current-room-id');
+      const shareInput = document.getElementById('share-link-input');
+
+      if (roomIdEl) roomIdEl.innerText = roomId;
+      
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('room', roomId);
+      if (shareInput) shareInput.value = currentUrl.toString();
+
+      if (badge) {
+        if (isOnline) {
+          badge.className = "px-2 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 text-center";
+          badge.innerText = "🟢 即時雲端同步中 (預設共享連線)";
+        } else {
+          badge.className = "px-2 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-700 text-center";
+          badge.innerText = "🟡 離線/單機模式 (已備份於瀏覽器)";
+        }
+      }
+    }
+
+    window.openSyncModal = function() {
+      updateSyncUI(!!db);
+      const modal = document.getElementById('sync-modal');
+      if (modal) modal.classList.remove('hidden');
+    };
+
+    window.closeSyncModal = function() {
+      const modal = document.getElementById('sync-modal');
+      if (modal) modal.classList.add('hidden');
+    };
+
+    window.copyShareLink = function() {
+      const shareInput = document.getElementById('share-link-input');
+      if (shareInput) {
+        shareInput.select();
+        document.execCommand('copy');
+        if (typeof window.showToast === 'function') window.showToast("已複製專屬邀請連結！傳給對方開啟即可一起編輯");
+      }
+    };
+
+    window.copyRoomCode = function() {
+      navigator.clipboard.writeText(roomId).then(() => {
+        if (typeof window.showToast === 'function') window.showToast(`已複製房間代碼：${roomId}`);
+      });
+    };
+
+    window.inviteByEmail = function() {
+      const input = document.getElementById('collaborator-email-input');
+      if (!input) return;
+      const email = input.value.trim();
+      if (!email) {
+        alert("請輸入有效的 Email 或代碼！");
+        return;
+      }
+
+      const cleanEmailKey = 'room_' + email.replace(/[^a-zA-Z0-9]/g, '_');
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('room', cleanEmailKey);
+      
+      if (typeof window.showToast === 'function') {
+        window.showToast(`已切換至房間：${cleanEmailKey}`);
+      }
+
+      setTimeout(() => {
+        window.location.href = currentUrl.toString();
+      }, 600);
+    };
+
+    window.openSyncModal = window.openSyncModal;
+    window.closeSyncModal = window.closeSyncModal;
+    window.inviteByEmail = window.inviteByEmail;
+    window.copyRoomCode = window.copyRoomCode;
+  </script>
+
+  <!-- Javascript Logic -->
+  <script>
+    const THEME_STYLES = {
+      rose: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-300', tagBg: 'bg-rose-500' },
+      blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300', tagBg: 'bg-blue-500' },
+      navy: { bg: 'bg-indigo-50', text: 'text-indigo-900', border: 'border-indigo-300', tagBg: 'bg-indigo-800' },
+      emerald: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', tagBg: 'bg-emerald-600' },
+      amber: { bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-300', tagBg: 'bg-amber-500' },
+      purple: { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-300', tagBg: 'bg-purple-600' },
+      cyan: { bg: 'bg-cyan-50', text: 'text-cyan-800', border: 'border-cyan-300', tagBg: 'bg-cyan-500' },
+      teal: { bg: 'bg-teal-50', text: 'text-teal-800', border: 'border-teal-300', tagBg: 'bg-teal-600' },
+      coral: { bg: 'bg-orange-50', text: 'text-orange-800', border: 'border-orange-300', tagBg: 'bg-orange-500' },
+      obsidian: { bg: 'bg-slate-100', text: 'text-slate-900', border: 'border-slate-400', tagBg: 'bg-slate-800' },
+      slate: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-300', tagBg: 'bg-slate-500' }
+    };
+
+    const INITIAL_GROUPS = [
+      { id: 'grp_1', name: '男方親友', theme: 'navy' },
+      { id: 'grp_2', name: '女方親友', theme: 'rose' },
+      { id: 'grp_3', name: '男方朋友', theme: 'emerald' },
+      { id: 'grp_4', name: '女方朋友', theme: 'purple' },
+      { id: 'grp_5', name: '工作人員', theme: 'amber' }
+    ];
+
+    const INITIAL_GUESTS = [
+      { id: 'g1', name: '張新郎', group: '男方親友', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g2', name: '李新娘', group: '女方親友', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g3', name: '張大伯', group: '男方親友', isVeg: true, isChild: false, hasChair: false },
+      { id: 'g4', name: '張大嬸', group: '男方親友', isVeg: true, isChild: false, hasChair: false },
+      { id: 'g5', name: '李媽媽', group: '女方親友', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g6', name: '李爸爸', group: '女方親友', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g7', name: '王小明', group: '男方朋友', isVeg: false, isChild: false, hasChair: true },
+      { id: 'g8', name: '陳小華', group: '男方朋友', isVeg: false, isChild: true, hasChair: false },
+      { id: 'g9', name: '林婷婷', group: '女方朋友', isVeg: true, isChild: false, hasChair: false },
+      { id: 'g10', name: '黃志偉', group: '女方朋友', isVeg: false, isChild: false, hasChair: true },
+      { id: 'g11', name: '周杰倫', group: '男方朋友', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g12', name: '蔡依林', group: '女方朋友', isVeg: true, isChild: false, hasChair: false },
+      { id: 'g13', name: '攝影師阿豪', group: '工作人員', isVeg: false, isChild: false, hasChair: false },
+      { id: 'g14', name: '新秘老師', group: '工作人員', isVeg: true, isChild: false, hasChair: false },
+    ];
+
+    const INITIAL_TABLES = [
+      { id: 't1', name: '主桌 (01)', x: 1400, y: 300, capacity: 10, seats: { 0: 'g1', 1: 'g2', 2: 'g3', 3: 'g4', 4: 'g5', 5: 'g6' } },
+      { id: 't2', name: '男方親友桌 (02)', x: 1100, y: 750, capacity: 10, seats: {} },
+      { id: 't3', name: '女方親友桌 (03)', x: 1700, y: 750, capacity: 10, seats: {} },
+      { id: 't4', name: '大學同學桌 (04)', x: 1100, y: 1250, capacity: 10, seats: {} },
+      { id: 't5', name: '公司同仁桌 (05)', x: 1700, y: 1250, capacity: 10, seats: {} },
+    ];
+
+    let customGroups = [];
+    let guests = [];
+    let tables = [];
+    let draggedGuestId = null;
+    let isBatchDeleteMode = false;
+    let selectedGuestIds = new Set();
+    let customConfirmCallback = null;
+
+    let movingTableId = null;
+    let tableOffsetX = 0;
+    let tableOffsetY = 0;
+    let isPanning = false;
+    let panX = -450;
+    let panY = -50;
+    let scale = 0.85;
+    let startX = 0;
+    let startY = 0;
+
+    function showCustomConfirm(title, msg, onConfirm) {
+      document.getElementById('confirm-modal-title').innerText = title;
+      document.getElementById('confirm-modal-msg').innerText = msg;
+      customConfirmCallback = onConfirm;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    window.closeCustomConfirm = function(isConfirmed) {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      if (isConfirmed && typeof customConfirmCallback === 'function') {
+        customConfirmCallback();
+      }
+      customConfirmCallback = null;
+    };
+
+    function getGroupStyle(groupName) {
+      const found = customGroups.find(g => g.name === groupName);
+      if (found && THEME_STYLES[found.theme]) {
+        return THEME_STYLES[found.theme];
+      }
+      return THEME_STYLES['slate'];
+    }
+
+    function initData() {
+      const savedGroups = localStorage.getItem('wedding_planner_groups');
+      const savedGuests = localStorage.getItem('wedding_planner_guests');
+      const savedTables = localStorage.getItem('wedding_planner_tables');
+
+      customGroups = savedGroups ? JSON.parse(savedGroups) : [...INITIAL_GROUPS];
+      guests = (savedGuests && savedTables) ? JSON.parse(savedGuests) : [...INITIAL_GUESTS];
+      tables = (savedGuests && savedTables) ? JSON.parse(savedTables) : [...INITIAL_TABLES];
+
+      saveState();
+      setupCanvasEvents();
+      updateCanvasTransform();
+      renderGroupDropdowns();
+      renderAll();
+    }
+
+    function saveState() {
+      localStorage.setItem('wedding_planner_groups', JSON.stringify(customGroups));
+      localStorage.setItem('wedding_planner_guests', JSON.stringify(guests));
+      localStorage.setItem('wedding_planner_tables', JSON.stringify(tables));
+      updateStats();
+      if (typeof window.pushCloudState === 'function') {
+        window.pushCloudState();
+      }
+    }
+
+    function exportJSONBackup() {
+      const backupData = {
+        groups: customGroups,
+        guests: guests,
+        tables: tables,
+        exportAt: new Date().toISOString()
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `wedding_seating_backup_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast("已成功下載 JSON 備份檔！");
+    }
+
+    function triggerRestoreJSON() {
+      document.getElementById('restore-json-input').click();
+    }
+
+    function importJSONBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.groups && data.guests && data.tables) {
+            customGroups = data.groups;
+            guests = data.guests;
+            tables = data.tables;
+            saveState();
+            renderGroupDropdowns();
+            renderAll();
+            showToast("成功還原備份資料！");
+          } else {
+            alert("備份檔案格式不正確！");
+          }
+        } catch(err) {
+          alert("解析備份檔案失敗：" + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function renderGroupDropdowns() {
+      const filterSelect = document.getElementById('filter-group');
+      const quickSelect = document.getElementById('quick-guest-group');
+      const formSelect = document.getElementById('form-guest-group');
+      const importSelect = document.getElementById('import-default-group');
+
+      let filterHtml = '<option value="ALL">所有族群</option>';
+      let optionsHtml = '';
+
+      customGroups.forEach(g => {
+        filterHtml += `<option value="${g.name}">${g.name}</option>`;
+        optionsHtml += `<option value="${g.name}">${g.name}</option>`;
+      });
+
+      if (filterSelect) filterSelect.innerHTML = filterHtml;
+      if (quickSelect) quickSelect.innerHTML = optionsHtml;
+      if (formSelect) formSelect.innerHTML = optionsHtml;
+      if (importSelect) importSelect.innerHTML = optionsHtml;
+    }
+
+    function renderAll() {
+      renderUnseatedList();
+      renderTablesOnCanvas();
+      updateStats();
+    }
+
+    function updateStats() {
+      const totalCount = guests.length;
+      const seatedSet = getSeatedGuestIds();
+      const seatedCount = seatedSet.size;
+      const unseatedCount = totalCount - seatedCount;
+
+      document.getElementById('stat-total').innerText = totalCount;
+      document.getElementById('stat-seated').innerText = seatedCount;
+      document.getElementById('stat-unseated').innerText = unseatedCount;
+      document.getElementById('stat-tables').innerText = tables.length;
+      document.getElementById('unseated-badge').innerText = unseatedCount;
+    }
+
+    function getSeatedGuestIds() {
+      const seated = new Set();
+      tables.forEach(t => {
+        Object.values(t.seats).forEach(gId => seated.add(gId));
+      });
+      return seated;
+    }
+
+    function toggleBatchDeleteMode() {
+      isBatchDeleteMode = !isBatchDeleteMode;
+      selectedGuestIds.clear();
+      const bar = document.getElementById('batch-action-bar');
+      const text = document.getElementById('batch-toggle-text');
+
+      if (isBatchDeleteMode) {
+        bar.classList.remove('hidden');
+        text.innerText = "結束多選";
+      } else {
+        bar.classList.add('hidden');
+        text.innerText = "多選刪除";
+      }
+      updateSelectedCountDisplay();
+      renderUnseatedList();
+    }
+
+    function toggleSelectGuest(guestId, isChecked) {
+      if (isChecked) {
+        selectedGuestIds.add(guestId);
+      } else {
+        selectedGuestIds.delete(guestId);
+      }
+      updateSelectedCountDisplay();
+    }
+
+    function toggleSelectAllUnseated(isChecked) {
+      const seatedIds = getSeatedGuestIds();
+      const searchTerm = document.getElementById('search-guest').value.trim().toLowerCase();
+      const groupFilter = document.getElementById('filter-group').value;
+
+      const visibleUnseated = guests.filter(g => {
+        const matchesSeated = !seatedIds.has(g.id);
+        const matchesSearch = g.name.toLowerCase().includes(searchTerm);
+        const matchesGroup = groupFilter === 'ALL' || g.group === groupFilter;
+        return matchesSeated && matchesSearch && matchesGroup;
+      });
+
+      if (isChecked) {
+        visibleUnseated.forEach(g => selectedGuestIds.add(g.id));
+      } else {
+        visibleUnseated.forEach(g => selectedGuestIds.delete(g.id));
+      }
+      updateSelectedCountDisplay();
+      renderUnseatedList();
+    }
+
+    function updateSelectedCountDisplay() {
+      const countSpan = document.getElementById('selected-count');
+      if (countSpan) countSpan.innerText = selectedGuestIds.size;
+    }
+
+    window.deleteSelectedGuests = function() {
+      if (selectedGuestIds.size === 0) {
+        alert("請先勾選要刪除的賓客！");
+        return;
+      }
+
+      const count = selectedGuestIds.size;
+      showCustomConfirm("批次刪除確認", `確定要刪除選取的 ${count} 位賓客嗎？`, () => {
+        guests = guests.filter(g => !selectedGuestIds.has(g.id));
+        tables.forEach(t => {
+          Object.keys(t.seats).forEach(sIdx => {
+            if (selectedGuestIds.has(t.seats[sIdx])) delete t.seats[sIdx];
+          });
+        });
+        selectedGuestIds.clear();
+        saveState();
+        updateSelectedCountDisplay();
+        renderAll();
+        showToast(`已刪除 ${count} 位賓客`);
+      });
+    };
+
+    window.deleteGuest = function(guestId) {
+      const guest = guests.find(g => g.id === guestId);
+      if (!guest) return;
+      
+      showCustomConfirm("刪除賓客確認", `確定要將賓客「${guest.name}」刪除嗎？`, () => {
+        guests = guests.filter(g => g.id !== guestId);
+        tables.forEach(t => {
+          Object.keys(t.seats).forEach(sIdx => {
+            if (t.seats[sIdx] === guestId) delete t.seats[sIdx];
+          });
+        });
+        saveState();
+        renderAll();
+        showToast(`已刪除賓客「${guest.name}」`);
+      });
+    };
+
+    window.unseatGuest = function(tableId, seatIndex) {
+      const table = tables.find(t => t.id === tableId);
+      if (table && table.seats[seatIndex]) {
+        delete table.seats[seatIndex];
+        saveState();
+        renderAll();
+        showToast("已取消該賓客的座位");
+      }
+    };
+
+    function renderUnseatedList() {
+      const container = document.getElementById('unseated-container');
+      const seatedIds = getSeatedGuestIds();
+      const searchTerm = document.getElementById('search-guest').value.trim().toLowerCase();
+      const groupFilter = document.getElementById('filter-group').value;
+
+      const unseatedGuests = guests.filter(g => {
+        const matchesSeated = !seatedIds.has(g.id);
+        const matchesSearch = g.name.toLowerCase().includes(searchTerm);
+        const matchesGroup = groupFilter === 'ALL' || g.group === groupFilter;
+        return matchesSeated && matchesSearch && matchesGroup;
+      });
+
+      container.innerHTML = '';
+
+      if (unseatedGuests.length === 0) {
+        container.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-slate-400 py-12 border-2 border-dashed border-slate-200 rounded-xl">
+            <i class="fa-solid fa-circle-check text-3xl mb-2 text-slate-300"></i>
+            <p class="text-xs">無未安排賓客</p>
+          </div>
+        `;
+        return;
+      }
+
+      unseatedGuests.forEach(guest => {
+        const style = getGroupStyle(guest.group);
+        const card = document.createElement('div');
+        const isSelected = selectedGuestIds.has(guest.id);
+
+        card.className = `p-2.5 bg-white border ${isSelected ? 'border-rosewood-500 bg-rosewood-50/20' : style.border} rounded-xl shadow-sm hover:shadow transition-all guest-card-cursor flex items-center justify-between group`;
+        if (!isBatchDeleteMode) {
+          card.draggable = true;
+          card.ondragstart = (e) => handleGuestDragStart(e, guest.id);
+          card.ondragend = handleGuestDragEnd;
+        }
+
+        const checkboxHtml = isBatchDeleteMode ? `
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelectGuest('${guest.id}', this.checked)" onclick="event.stopPropagation()" class="rounded text-rosewood-500 focus:ring-rosewood-500 mr-1.5">
+        ` : '';
+
+        card.innerHTML = `
+          <div class="flex items-center space-x-2">
+            ${checkboxHtml}
+            <div class="w-2.5 h-2.5 rounded-full ${style.tagBg}"></div>
+            <div>
+              <div class="font-bold text-xs text-slate-800 flex items-center space-x-1">
+                <span>${guest.name}</span>
+                ${guest.isVeg ? '<span title="素食" class="text-xs">🥬</span>' : ''}
+                ${guest.isChild ? '<span title="小孩" class="text-xs">👦</span>' : ''}
+                ${guest.hasChair ? '<span title="兒童椅" class="text-xs">👶</span>' : ''}
+              </div>
+              <div class="text-[10px] text-slate-400">${guest.group}</div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-1 opacity-60 group-hover:opacity-100 shrink-0">
+            <button type="button" class="btn-edit-guest p-1 text-slate-400 hover:text-slate-600 text-xs" title="編輯賓客"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button type="button" class="btn-delete-guest p-1 text-slate-400 hover:text-rosewood-500 text-xs" title="刪除賓客"><i class="fa-solid fa-trash-can"></i></button>
+          </div>
+        `;
+
+        const editBtn = card.querySelector('.btn-edit-guest');
+        const deleteBtn = card.querySelector('.btn-delete-guest');
+
+        if (editBtn) {
+          editBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.openEditGuestModal(guest.id);
+          });
+        }
+
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.deleteGuest(guest.id);
+          });
+        }
+
+        container.appendChild(card);
+      });
+    }
+
+    function renderTablesOnCanvas() {
+      const container = document.getElementById('tables-container');
+      container.innerHTML = '';
+
+      tables.forEach(table => {
+        const seatedCount = Object.keys(table.seats).length;
+        let vegCount = 0;
+        let childCount = 0;
+        let chairCount = 0;
+        Object.values(table.seats).forEach(gId => {
+          const g = guests.find(x => x.id === gId);
+          if (g) {
+            if (g.isVeg) vegCount++;
+            if (g.isChild) childCount++;
+            if (g.hasChair) chairCount++;
+          }
+        });
+
+        const tableNode = document.createElement('div');
+        tableNode.className = `table-node absolute bg-white border-2 border-slate-300 rounded-3xl p-4 shadow-lg flex flex-col items-center justify-between transition-shadow hover:shadow-xl w-[400px] select-none`;
+        tableNode.style.left = `${table.x}px`;
+        tableNode.style.top = `${table.y}px`;
+
+        let headerHtml = `
+          <div class="w-full flex items-center justify-between border-b pb-2.5 mb-3 cursor-move"
+               onmousedown="startMovingTable(event, '${table.id}')">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-grip-vertical text-slate-300"></i>
+              <span class="w-3 h-3 rounded-full bg-rosewood-500"></span>
+              <input type="text" value="${table.name}" 
+                     onchange="renameTable('${table.id}', this.value)" 
+                     onmousedown="event.stopPropagation()"
+                     class="font-bold text-slate-800 text-sm bg-transparent hover:bg-slate-100 rounded px-1.5 py-0.5 border border-transparent hover:border-slate-300 focus:outline-none focus:bg-white focus:border-rosewood-500 w-44">
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+              <span class="px-2 py-0.5 rounded-full font-semibold ${seatedCount === table.capacity ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}">
+                ${seatedCount} / ${table.capacity} 人
+              </span>
+              <button onclick="deleteTable('${table.id}')" onmousedown="event.stopPropagation()" class="text-slate-300 hover:text-rosewood-500 p-1">
+                <i class="fa-solid fa-xmark text-sm"></i>
+              </button>
+            </div>
+          </div>
+        `;
+
+        let summaryHtml = `
+          <div class="w-full flex justify-between text-xs bg-slate-50 px-3 py-1 rounded-lg text-slate-500 mb-3">
+            <span>🥬 素食: <strong class="text-slate-800">${vegCount}</strong></span>
+            <span>👦 小孩: <strong class="text-slate-800">${childCount}</strong></span>
+            <span>👶 兒童椅: <strong class="text-slate-800">${chairCount}</strong></span>
+          </div>
+        `;
+
+        let seatsGridHtml = `<div class="grid grid-cols-2 gap-2 w-full">`;
+
+        for (let i = 0; i < table.capacity; i++) {
+          const guestId = table.seats[i];
+          const guest = guests.find(g => g.id === guestId);
+
+          if (guest) {
+            const style = getGroupStyle(guest.group);
+            seatsGridHtml += `
+              <div class="p-2 border ${style.border} ${style.bg} rounded-xl flex items-center justify-between cursor-grab group/seat transition-all"
+                   draggable="true"
+                   ondragstart="handleGuestDragStart(event, '${guest.id}', '${table.id}', ${i})"
+                   ondragend="handleGuestDragEnd(event)"
+                   ondragover="handleGuestDragOver(event)"
+                   ondragleave="handleGuestDragLeave(event)"
+                   ondrop="handleDropToSeat(event, '${table.id}', ${i})">
+                <div class="flex items-center space-x-1.5 truncate">
+                  <span class="text-[10px] font-bold text-slate-400">${i+1}.</span>
+                  <span class="font-medium text-xs text-slate-800 truncate">${guest.name}</span>
+                </div>
+                <div class="flex items-center space-x-1 shrink-0">
+                  ${guest.isVeg ? '<span class="text-xs">🥬</span>' : ''}
+                  ${guest.isChild ? '<span class="text-xs">👦</span>' : ''}
+                  ${guest.hasChair ? '<span class="text-xs">👶</span>' : ''}
+                  <button onclick="unseatGuest('${table.id}', ${i}); event.stopPropagation();" title="取消座位" class="opacity-0 group-hover/seat:opacity-100 text-slate-400 hover:text-amber-600 text-xs px-0.5">
+                    <i class="fa-solid fa-circle-minus"></i>
+                  </button>
+                  <button onclick="deleteGuest('${guest.id}'); event.stopPropagation();" title="刪除賓客" class="opacity-0 group-hover/seat:opacity-100 text-slate-400 hover:text-rosewood-500 text-xs px-0.5">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+            `;
+          } else {
+            seatsGridHtml += `
+              <div class="p-2 border-2 border-dashed border-slate-200 hover:border-rosewood-400 bg-slate-50/50 hover:bg-rosewood-50/30 rounded-xl flex items-center justify-center text-slate-300 text-xs transition-all min-h-[38px] cursor-pointer"
+                   ondragover="handleGuestDragOver(event)"
+                   ondragleave="handleGuestDragLeave(event)"
+                   ondrop="handleDropToSeat(event, '${table.id}', ${i})">
+                <span class="text-[10px] font-bold text-slate-300 mr-1">${i+1}.</span>
+                <span class="text-[11px] text-slate-400 pointer-events-none">空位</span>
+              </div>
+            `;
+          }
+        }
+        seatsGridHtml += `</div>`;
+
+        tableNode.innerHTML = headerHtml + summaryHtml + seatsGridHtml;
+        container.appendChild(tableNode);
+      });
+    }
+
+    function setupCanvasEvents() {
+      const viewport = document.getElementById('viewport');
+
+      viewport.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.table-node')) return;
+        isPanning = true;
+        viewport.classList.remove('canvas-cursor-grab');
+        viewport.classList.add('canvas-cursor-grabbing');
+        startX = e.clientX - panX;
+        startY = e.clientY - panY;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (movingTableId) {
+          const table = tables.find(t => t.id === movingTableId);
+          if (table) {
+            table.x = Math.max(0, Math.round((e.clientX - tableOffsetX) / scale / 10) * 10);
+            table.y = Math.max(0, Math.round((e.clientY - tableOffsetY) / scale / 10) * 10);
+            renderTablesOnCanvas();
+          }
+          return;
+        }
+
+        if (isPanning) {
+          panX = e.clientX - startX;
+          panY = e.clientY - startY;
+          updateCanvasTransform();
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (movingTableId) {
+          movingTableId = null;
+          saveState();
+        }
+        if (isPanning) {
+          isPanning = false;
+          viewport.classList.remove('canvas-cursor-grabbing');
+          viewport.classList.add('canvas-cursor-grab');
+        }
+      });
+
+      viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.08 : -0.08;
+        zoomCanvas(delta);
+      }, { passive: false });
+    }
+
+    function zoomCanvas(delta) {
+      scale = Math.min(Math.max(0.4, scale + delta), 1.8);
+      updateCanvasTransform();
+    }
+
+    function resetZoomAndPan() {
+      scale = 0.85;
+      panX = -450;
+      panY = -50;
+      updateCanvasTransform();
+    }
+
+    function updateCanvasTransform() {
+      const canvas = document.getElementById('canvas');
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      document.getElementById('zoom-level-text').innerText = `${Math.round(scale * 100)}%`;
+    }
+
+    function startMovingTable(e, tableId) {
+      movingTableId = tableId;
+      const table = tables.find(t => t.id === tableId);
+      if (table) {
+        tableOffsetX = e.clientX - table.x * scale;
+        tableOffsetY = e.clientY - table.y * scale;
+      }
+    }
+
+    function renameTable(tableId, newName) {
+      const table = tables.find(t => t.id === tableId);
+      if (table && newName.trim()) {
+        table.name = newName.trim();
+        saveState();
+      }
+    }
+
+    function openAddTableModal() {
+      const nextNum = (tables.length + 1).toString().padStart(2, '0');
+      document.getElementById('new-table-name').value = `桌次 (${nextNum})`;
+      document.getElementById('new-table-capacity').value = '10';
+      document.getElementById('add-table-modal').classList.remove('hidden');
+    }
+
+    function closeAddTableModal() {
+      document.getElementById('add-table-modal').classList.add('hidden');
+    }
+
+    function handleSaveNewTable(e) {
+      e.preventDefault();
+      const name = document.getElementById('new-table-name').value.trim();
+      const capacity = parseInt(document.getElementById('new-table-capacity').value) || 10;
+      if (!name) return;
+
+      tables.push({
+        id: 't_' + Date.now(),
+        name: name,
+        x: 1400,
+        y: 800,
+        capacity: capacity,
+        seats: {}
+      });
+
+      saveState();
+      renderAll();
+      closeAddTableModal();
+      showToast(`已建立「${name}」`);
+    }
+
+    function deleteTable(tableId) {
+      const table = tables.find(t => t.id === tableId);
+      if (!table) return;
+
+      showCustomConfirm("刪除桌次確認", `確定要刪除「${table.name}」嗎？`, () => {
+        tables = tables.filter(t => t.id !== tableId);
+        saveState();
+        renderAll();
+        showToast(`已刪除「${table.name}」`);
+      });
+    }
+
+    function handleGuestDragStart(e, guestId) {
+      draggedGuestId = guestId;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', guestId);
+    }
+
+    function handleGuestDragEnd(e) {
+      draggedGuestId = null;
+    }
+
+    function handleGuestDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleGuestDragLeave(e) {}
+
+    function handleDropToSeat(e, targetTableId, targetSeatIndex) {
+      e.preventDefault();
+      const guestId = e.dataTransfer.getData('text/plain') || draggedGuestId;
+      if (!guestId) return;
+
+      tables.forEach(t => {
+        Object.keys(t.seats).forEach(sIdx => {
+          if (t.seats[sIdx] === guestId) delete t.seats[sIdx];
+        });
+      });
+
+      const targetTable = tables.find(t => t.id === targetTableId);
+      if (targetTable) {
+        targetTable.seats[targetSeatIndex] = guestId;
+        saveState();
+        renderAll();
+        showToast("賓客已安排入座！");
+      }
+    }
+
+    function handleDropToUnseated(e) {
+      e.preventDefault();
+      const guestId = e.dataTransfer.getData('text/plain') || draggedGuestId;
+      if (!guestId) return;
+
+      tables.forEach(t => {
+        Object.keys(t.seats).forEach(sIdx => {
+          if (t.seats[sIdx] === guestId) delete t.seats[sIdx];
+        });
+      });
+
+      saveState();
+      renderAll();
+      showToast("已移回未安排區");
+    }
+
+    function openImportModal() {
+      renderGroupDropdowns();
+      document.getElementById('import-text').value = '';
+      document.getElementById('import-modal').classList.remove('hidden');
+    }
+
+    function closeImportModal() {
+      document.getElementById('import-modal').classList.add('hidden');
+    }
+
+    function processBatchImport() {
+      const text = document.getElementById('import-text').value.trim();
+      const defaultGroup = document.getElementById('import-default-group').value || customGroups[0].name;
+
+      if (!text) {
+        alert("請先貼上資料！");
+        return;
+      }
+
+      const lines = text.split('\n');
+      let countImported = 0;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.includes('姓名')) return;
+
+        const tokens = trimmed.split(/[\t,]/).map(t => t.trim());
+        const name = tokens[0];
+        if (!name) return;
+
+        const count = parseInt(tokens[1]) || 1;
+        const vegNum = parseInt(tokens[2]) || 0;
+        const childNum = parseInt(tokens[3]) || 0;
+        const chairNum = parseInt(tokens[4]) || 0;
+
+        for (let i = 1; i <= count; i++) {
+          guests.push({
+            id: 'g_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name: count > 1 ? `${name} #${i}` : name,
+            group: defaultGroup,
+            isVeg: i <= vegNum,
+            isChild: i <= childNum,
+            hasChair: i <= chairNum
+          });
+          countImported++;
+        }
+      });
+
+      saveState();
+      renderAll();
+      closeImportModal();
+      showToast(`已成功匯入 ${countImported} 位賓客！`);
+    }
+
+    function openAddGuestModal() {
+      renderGroupDropdowns();
+      document.getElementById('modal-title').innerText = "新增賓客資料";
+      document.getElementById('guest-form').reset();
+      document.getElementById('form-guest-id').value = '';
+      document.getElementById('form-guest-count').value = '1';
+      document.getElementById('form-count-container').style.display = 'block';
+      document.getElementById('guest-modal').classList.remove('hidden');
+    }
+
+    function closeGuestModal() {
+      document.getElementById('guest-modal').classList.add('hidden');
+    }
+
+    function openEditGuestModal(guestId) {
+      renderGroupDropdowns();
+      const guest = guests.find(g => g.id === guestId);
+      if (!guest) return;
+
+      document.getElementById('modal-title').innerText = "編輯賓客資料";
+      document.getElementById('form-guest-id').value = guest.id;
+      document.getElementById('form-guest-name').value = guest.name;
+      document.getElementById('form-guest-group').value = guest.group;
+      document.getElementById('form-guest-veg').checked = !!guest.isVeg;
+      document.getElementById('form-guest-child').checked = !!guest.isChild;
+      document.getElementById('form-guest-chair').checked = !!guest.hasChair;
+      document.getElementById('form-count-container').style.display = 'none';
+
+      document.getElementById('guest-modal').classList.remove('hidden');
+    }
+
+    function saveGuest(e) {
+      e.preventDefault();
+      const id = document.getElementById('form-guest-id').value;
+      const name = document.getElementById('form-guest-name').value.trim();
+      const group = document.getElementById('form-guest-group').value;
+      const isVeg = document.getElementById('form-guest-veg').checked;
+      const isChild = document.getElementById('form-guest-child').checked;
+      const hasChair = document.getElementById('form-guest-chair').checked;
+      const count = parseInt(document.getElementById('form-guest-count').value) || 1;
+
+      if (!name) return;
+
+      if (id) {
+        const guest = guests.find(g => g.id === id);
+        if (guest) {
+          guest.name = name;
+          guest.group = group;
+          guest.isVeg = isVeg;
+          guest.isChild = isChild;
+          guest.hasChair = hasChair;
+        }
+      } else {
+        for (let i = 1; i <= count; i++) {
+          guests.push({
+            id: 'g_' + Date.now() + '_' + i,
+            name: count > 1 ? `${name} #${i}` : name,
+            group,
+            isVeg: i === 1 ? isVeg : false,
+            isChild: i === 1 ? isChild : false,
+            hasChair: i === 1 ? hasChair : false
+          });
+        }
+      }
+
+      saveState();
+      renderAll();
+      closeGuestModal();
+      showToast(id ? "資料已更新" : `新增 ${count} 位賓客`);
+    }
+
+    function openExportModal() {
+      const container = document.getElementById('export-content');
+      container.innerHTML = '';
+
+      let totalVeg = 0;
+      let totalChild = 0;
+      let totalChair = 0;
+
+      tables.forEach(table => {
+        const seatedGuestList = [];
+        let vegCount = 0;
+        let childCount = 0;
+        let chairCount = 0;
+
+        for (let i = 0; i < table.capacity; i++) {
+          const gId = table.seats[i];
+          if (gId) {
+            const guest = guests.find(g => g.id === gId);
+            if (guest) {
+              seatedGuestList.push(guest);
+              if (guest.isVeg) vegCount++;
+              if (guest.isChild) childCount++;
+              if (guest.hasChair) chairCount++;
+            }
+          }
+        }
+
+        totalVeg += vegCount;
+        totalChild += childCount;
+        totalChair += chairCount;
+
+        const tableBox = document.createElement('div');
+        tableBox.className = "border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-2";
+
+        let guestNamesHtml = seatedGuestList.map((g, idx) => `
+          <span class="inline-block bg-white border border-slate-200 px-2.5 py-1 rounded-md text-xs text-slate-700 font-medium">
+            ${idx + 1}. ${g.name} ${g.isVeg ? '🥬' : ''} ${g.isChild ? '👦' : ''} ${g.hasChair ? '👶' : ''}
+          </span>
+        `).join(' ');
+
+        if (seatedGuestList.length === 0) {
+          guestNamesHtml = '<span class="text-xs text-slate-400 italic">尚無賓客入座</span>';
+        }
+
+        tableBox.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h4 class="font-bold text-slate-800 text-sm">${table.name} (${seatedGuestList.length}/${table.capacity} 人)</h4>
+            <div class="text-xs text-slate-500 space-x-3">
+              <span>素食: <strong class="text-slate-800">${vegCount}</strong></span>
+              <span>小孩: <strong class="text-slate-800">${childCount}</strong></span>
+              <span>兒童椅: <strong class="text-slate-800">${chairCount}</strong></span>
+            </div>
+          </div>
+          <div class="pt-1 flex flex-wrap gap-1.5">
+            ${guestNamesHtml}
+          </div>
+        `;
+
+        container.appendChild(tableBox);
+      });
+
+      const summaryBar = document.createElement('div');
+      summaryBar.className = "bg-rosewood-50 border border-rosewood-100 p-3.5 rounded-xl flex justify-between items-center text-xs font-bold text-rosewood-800 mb-4";
+      summaryBar.innerHTML = `
+        <div>全場餐點與設備統計:</div>
+        <div class="space-x-4">
+          <span>全場素食總計 🥬 : ${totalVeg} 份</span>
+          <span>小孩總計 👦 : ${totalChild} 位</span>
+          <span>兒童椅需求總計 👶 : ${totalChair} 張</span>
+        </div>
+      `;
+      container.prepend(summaryBar);
+
+      document.getElementById('export-modal').classList.remove('hidden');
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').classList.add('hidden');
+    }
+
+    function resetDataConfirm() {
+      showCustomConfirm("重設資料確認", "確定要重設回預設資料嗎？", () => {
+        localStorage.removeItem('wedding_planner_groups');
+        localStorage.removeItem('wedding_planner_guests');
+        localStorage.removeItem('wedding_planner_tables');
+        initData();
+        showToast("已恢復範例資料！");
+      });
+    }
+
+    window.openImportModal = openImportModal;
+    window.closeImportModal = closeImportModal;
+    window.openManageGroupsModal = () => document.getElementById('groups-modal').classList.remove('hidden');
+    window.closeManageGroupsModal = () => document.getElementById('groups-modal').classList.add('hidden');
+    window.openAddGuestModal = openAddGuestModal;
+    window.closeGuestModal = closeGuestModal;
+    window.openEditGuestModal = openEditGuestModal;
+    window.openAddTableModal = openAddTableModal;
+    window.closeAddTableModal = closeAddTableModal;
+    window.openExportModal = openExportModal;
+    window.closeExportModal = closeExportModal;
+    window.resetDataConfirm = resetDataConfirm;
+    window.unseatGuest = unseatGuest;
+    window.deleteSelectedGuests = deleteSelectedGuests;
+    window.deleteGuest = deleteGuest;
+    window.exportJSONBackup = exportJSONBackup;
+    window.triggerRestoreJSON = triggerRestoreJSON;
+    window.importJSONBackup = importJSONBackup;
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
+
+    window.onload = function() {
+      initData();
+    };
+  </script>
+</body>
+</html>
